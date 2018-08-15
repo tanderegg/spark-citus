@@ -14,7 +14,7 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- * 
+ *
  * Contributors:
  *     Makoto YUI - initial implementation
  */
@@ -48,7 +48,15 @@ public final class JenkinsHash {
     }
 
     public static int hash32(final byte[] key, final int initval) {
-        return hash32(key, key.length, initval);
+      return hash32(key, key.length, initval);
+    }
+
+    public static long postgresHashint8(final byte[] key) {
+      return hash64(key, 8, 3923095);
+    }
+
+    public static long hash64(final byte[key], final long initval) {
+      return hash64(key, key.length, initval);
     }
 
     /**

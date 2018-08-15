@@ -3,7 +3,7 @@ package org.koeninger.spark.citus
 /** container of info for an individual shard placement */
 case class ShardPlacement(
     tableName: String,
-    shardMaxValue: Int,
+    shardMaxValue: Long,
     shardId: Int,
     nodeName: String,
     nodePort: Int) {

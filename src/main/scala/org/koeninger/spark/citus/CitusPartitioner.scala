@@ -21,9 +21,11 @@ class CitusPartitioner(placements: Array[ShardPlacement]) extends Partitioner {
   override def getPartition(key: Any): Int = {
     key match {
       case (table: String, k: Int) =>
-        findPartition(table, k)
+        findPartition32(table, k)
+      case (table: String, k: Long) =>
+        findPartition64(table, k)
       case k: CitusKey =>
-        findPartition(k.table, k.key)
+        findPartition32(k.table, k.key)
     }
   }
 
@@ -36,7 +38,7 @@ class CitusPartitioner(placements: Array[ShardPlacement]) extends Partitioner {
     // only building one array of buckets, based on the first table in placements
     var finishedBuckets = false
     val tableBuf = new ArrayBuffer[String]()
-    val bucketBuf = new ArrayBuffer[Int]()
+    val bucketBuf = new ArrayBuffer[Long]()
     placements.foreach { p =>
       if (tableBuf.isEmpty) {
         tableBuf.append(p.tableName)
@@ -60,7 +62,8 @@ class CitusPartitioner(placements: Array[ShardPlacement]) extends Partitioner {
     assert(tables.size == tables.toSet.size, "tables must not be repeated out of order")
     assert(tables.sorted.toSeq == tables.toSeq, "placements must be sorted by table")
     assert(buckets.sorted.toSeq == buckets.toSeq, "placements must be sorted by table, then shardmaxvalue")
-    assert(buckets.last == Int.MaxValue, "shardmaxvalue should top out at Int.MaxValue")
+    // Remove for now to handle Longs
+    //assert(buckets.last == Int.MaxValue, "shardmaxvalue should top out at Int.MaxValue")
     (tables, buckets)
   }
 
@@ -69,19 +72,40 @@ class CitusPartitioner(placements: Array[ShardPlacement]) extends Partitioner {
 
   // Needed for hashing
   // Not sure whether a threadlocal for this is faster than just allocating a new one each time
-  @transient private var byteBuf: ThreadLocal[ByteBuffer] = null
+  @transient private var byteBuf32: ThreadLocal[ByteBuffer] = null
 
-  private def getByteBuf(): ByteBuffer = {
-    if (null == byteBuf) {
-      byteBuf = new ThreadLocal[ByteBuffer] {
+  private def getByteBuf32(): ByteBuffer = {
+    if (null == byteBuf32) {
+      byteBuf32 = new ThreadLocal[ByteBuffer] {
         override def initialValue() = ByteBuffer.allocate(4).order(ByteOrder.LITTLE_ENDIAN)
       }
     }
-    byteBuf.get
+    byteBuf32.get
+  }
+
+  @transient private var byteBuf64: ThreadLocal[ByteBuffer] = null
+
+  private def getByteBuf64(): ByteBuffer = {
+    if (null == byteBuf64) {
+      byteBuf64 = new ThreadLocal[ByteBuffer] {
+        override def initialValue() = ByteBuffer.allocate(8).order(ByteOrder.LITTLE_ENDIAN)
+      }
+    }
+    byteBuf64.get
   }
 
   /** given an already hashed value, find the index of the bucket that value should fall in */
-  def findBucket(hashed: Int): Int = {
+  def findBucket32(hashed: Int): Int = {
+    var i = 0
+    // This only needs a single conditional check because Int.MaxValue is a sentinel at the end of the buckets array
+    // Because it's only a single branch, should be close in perf to a binary search for up to 64 ~ 128 buckets
+    while (hashed > buckets(i)) {
+      i = i + 1
+    }
+    i
+  }
+
+  def findBucket64(hashed: Long): Int = {
     var i = 0
     // This only needs a single conditional check because Int.MaxValue is a sentinel at the end of the buckets array
     // Because it's only a single branch, should be close in perf to a binary search for up to 64 ~ 128 buckets
@@ -92,12 +116,20 @@ class CitusPartitioner(placements: Array[ShardPlacement]) extends Partitioner {
   }
 
   /** given a table name and UNhashed value, find the partition aka placement index */
-  def findPartition(tableName: String, unhashed: Int): Int = {
-    val bb = getByteBuf
+  def findPartition32(tableName: String, unhashed: Int): Int = {
+    val bb = getByteBuf32
     bb.clear
-    val hashed = JenkinsHash.postgresHashint4(bb.putInt(unhashed).array)
+    val hashed = JenkinsHash.postgresHashint4(bb.put(unhashed).array)
 
-    (tables.indexOf(tableName) * buckets.size) + findBucket(hashed)
+    (tables.indexOf(tableName) * buckets.size) + findBucket32(hashed)
+  }
+
+  def findPartition64(tableName: String, unhashed: Long): Long = {
+    val bb = getByteBuf64
+    bb.clear
+    val hashed = JenkinsHash.postgresHashint8(bb.put(unhashed).array)
+
+    (tables.indexOf(tableName) * buckets.size) + findBucket64(hashed)
   }
 
   /** given a partition ID, return the correct shard placement */
@@ -116,7 +148,7 @@ object CitusPartitioner {
     val placements = sql"""
 select
  (ds.logicalrelid::regclass)::varchar as tablename,
- ds.shardmaxvalue::integer as hmax,
+ ds.shardmaxvalue::biginteger as hmax,
  ds.shardid::integer,
  p.nodename::varchar,
  p.nodeport::integer
@@ -125,7 +157,7 @@ from pg_dist_shard ds
 where (ds.logicalrelid::regclass)::varchar in ($tables)
 order by tablename, hmax asc
 """.map { rs =>
-      ShardPlacement(rs.string(1), rs.int(2), rs.int(3), rs.string(4), rs.int(5))
+      ShardPlacement(rs.string(1), rs.long(2), rs.int(3), rs.string(4), rs.int(5))
     }.list.apply()
 
     assert(placements.map(_.tableName).toSet == tables.toSet, "Not all tables were present in pg_dist_shard_placement")
