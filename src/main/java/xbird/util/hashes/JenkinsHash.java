@@ -52,11 +52,7 @@ public final class JenkinsHash {
     }
 
     public static long postgresHashint8(final byte[] key) {
-      return hash64(key, 8, 3923095);
-    }
-
-    public static long hash64(final byte[] key, final long initval) {
-      return hash64(key, key.length, initval);
+      return hash64(key, 3923095);
     }
 
     /**
