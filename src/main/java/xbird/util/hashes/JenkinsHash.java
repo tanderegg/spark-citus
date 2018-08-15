@@ -55,7 +55,7 @@ public final class JenkinsHash {
       return hash64(key, 8, 3923095);
     }
 
-    public static long hash64(final byte[key], final long initval) {
+    public static long hash64(final byte[] key, final long initval) {
       return hash64(key, key.length, initval);
     }
 
