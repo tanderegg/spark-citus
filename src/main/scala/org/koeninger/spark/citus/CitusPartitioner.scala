@@ -127,9 +127,11 @@ class CitusPartitioner(placements: Array[ShardPlacement]) extends Partitioner {
   }
 
   def findPartitionString32(tableName: String, unhashed: String): Int = {
-    val bb = getByteBuf32
+    val unhashed_bytes = unhashed.getBytes
+    val bb = ByteBuffer.allocate(unhashed_bytes.length).order(ByteOrder.LITTLE_ENDIAN)
     bb.clear
-    val hashed = JenkinsHash.postgresHashint4(bb.put(unhashed.getBytes).array)
+
+    val hashed = JenkinsHash.postgresHashString32(bb.put(unhashed_bytes).array)
 
     (tables.indexOf(tableName) * buckets.size) + findBucket32(hashed)
   }

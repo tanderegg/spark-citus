@@ -55,6 +55,10 @@ public final class JenkinsHash {
       return hash64(key, 3923095);
     }
 
+    public static int postgresHashString32(final byte[] key) {
+      return hash32(key, 3923096);
+    }
+
     /**
      * taken from  hashlittle() -- hash a variable-length key into a 32-bit value
      *
