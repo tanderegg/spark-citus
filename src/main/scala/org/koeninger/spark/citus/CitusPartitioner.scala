@@ -158,7 +158,7 @@ object CitusPartitioner {
     val placements = sql"""
 select
  (ds.logicalrelid::regclass)::varchar as tablename,
- ds.shardmaxvalue::biginteger as hmax,
+ ds.shardmaxvalue::bigint as hmax,
  ds.shardid::integer,
  p.nodename::varchar,
  p.nodeport::integer
