@@ -1,10 +1,10 @@
 name := "spark-citus"
 
-version := "0.1"
+version := "0.2"
 
 scalaVersion := "2.11.8"
 
-val sparkVersion = "2.0.2"
+val sparkVersion = "2.2.0"
 
 libraryDependencies ++= Seq(
   ("org.apache.spark" %% "spark-core" % sparkVersion % "provided").
@@ -13,7 +13,7 @@ libraryDependencies ++= Seq(
   // avoid an ivy bug
   "org.apache.spark" %% "spark-network-common" % sparkVersion % "provided",
   "org.apache.spark" %% "spark-network-shuffle" % sparkVersion % "provided",
-  ("org.scalikejdbc" %% "scalikejdbc" % "2.2.1").
+  ("org.scalikejdbc" %% "scalikejdbc" % "3.3.0").
     exclude("org.slf4j", "slf4j-api"),
   ("org.postgresql" % "postgresql" % "9.3-1101-jdbc4").
     exclude("org.slf4j", "slf4j-api"),
